@@ -58,7 +58,7 @@ cd discord-chat-mirror
 ```
 Rename `.env.example` to `.env` and fill the value;
 ```bash
-mv .env.example .env
+mv .env_example.example .env_example
 ```
 Install dependencies;
 ```bash
