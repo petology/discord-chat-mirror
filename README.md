@@ -50,7 +50,7 @@ The following tools were used in this project:
 
 Clone this project;
 ```bash
-git clone https://github.com/Tiramitzu/discord-chat-mirror.git
+git clone https://github.com/pwtology/discord-chat-mirror.git
 ```
 Access the script with;
 ```bash
