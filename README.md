@@ -50,7 +50,7 @@ The following tools were used in this project:
 
 Clone this project;
 ```bash
-git clone https://github.com/Tiramitzu/discord-chat-mirror.git
+git clone https://github.com/petology/discord-chat-mirror.git
 ```
 Access the script with;
 ```bash
@@ -77,6 +77,10 @@ or if you are using yarn
 ```bash
 yarn build && yarn start
 ```
+
+## Adjustments ##
+Change .env File with your own values of channels and webhooks like in the example
+
 ## License ##
 This project is under the license of BSD 3-Clause. For more details, see the [LICENSE](LICENSE) file.
 
