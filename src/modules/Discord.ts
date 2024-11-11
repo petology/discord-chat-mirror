@@ -9,10 +9,10 @@ import { WebhookClient, Client, GatewayIntentBits, GatewayDispatchEvents, Gatewa
 import Websocket from "ws";
 
 import type { DiscordWebhook, Things, WebsocketTypes } from "../typings/index.js";
-import { channelsId, discordToken, webhooksUrl, enableBotIndicator, headers, useWebhookProfile } from "../utils/env.js";
+import { routes, discordToken, webhooksUrl, enableBotIndicator, headers, useWebhookProfile } from "../utils/env.js";
 
 export const executeWebhook = async (things: Things): Promise<void> => {
-    const wsClient = new WebhookClient({ url: things.url });
+    const wsClient = new WebhookClient({ url: things.url });  // things.url is a string
     await wsClient.send(things);
 };
 
@@ -34,6 +34,7 @@ export const listen = (): void => {
     ws.on("open", () => {
         console.log("Connected to the Discord API.");
     });
+
     ws.on("message", async (data: [any]) => {
         const payload: GatewayReceivePayload = JSON.parse(data.toString()) as GatewayReceivePayload;
         const { op, d, s, t } = payload;
@@ -78,59 +79,64 @@ export const listen = (): void => {
                 }
                 break;
             case GatewayOpcodes.Dispatch:
-                if (t === GatewayDispatchEvents.MessageCreate && channelsId.includes(d.channel_id)) {
+                if (t === GatewayDispatchEvents.MessageCreate) {
+                    const { content, attachments, embeds, sticker_items, author, channel_id } = d;
+                    const { avatar, username, discriminator: discriminatorRaw, id, bot } = author;
+
+                    if (bot) return;
+
                     let ext = "jpg";
                     let ub = " [USER]";
-
-                    const { content, attachments, embeds, sticker_items, author } = d;
-                    const { avatar, username, discriminator: discriminatorRaw, id, bot } = author;
-                    let discriminator: string | null = discriminatorRaw;
-
-                    discriminator = discriminator === "0" ? null : `#${discriminator}`;
-
+                    const discriminator: string | null = discriminatorRaw === "0" ? null : `#${discriminatorRaw}`;
                     if (avatar?.startsWith("a_") ?? false) ext = "gif";
                     if (bot ?? false) ub = " [BOT]";
 
-                    for (const webhookUrl of webhooksUrl) {
-                        const things: Things = {
-                            avatarURL:
-                                avatar ?? ""
-                                    ? `https://cdn.discordapp.com/avatars/${id}/${avatar}.${ext}`
-                                    : `https://cdn.discordapp.com/embed/avatars/${(BigInt(id) >> 22n) % 6n}.png`,
-                            content: content ?? "** **\n",
-                            url: webhookUrl,
-                            username: `${username}${discriminator ?? ""}${enableBotIndicator ? ub : ""}`
-                        };
+                    // Check if this message's channel_id matches a source channel in any route
+                    for (const [i, route] of routes.entries()) {
+                        if (route.source === channel_id) {
+                            const webhookUrl = webhooksUrl[i];  // webhookUrl is a string now
 
-                        if (useWebhookProfile) {
-                            const webhookData = await fetch(webhookUrl, {
-                                method: "GET",
-                                headers
-                            });
+                            const things: Things = {
+                                avatarURL:
+                                    avatar ?? ""
+                                        ? `https://cdn.discordapp.com/avatars/${id}/${avatar}.${ext}`
+                                        : `https://cdn.discordapp.com/embed/avatars/${(BigInt(id) >> 22n) % 6n}.png`,
+                                content: content ?? "** **\n",
+                                url: webhookUrl,  // Now matches `Things` type
+                                username: `${username}${discriminator ?? ""}${enableBotIndicator ? ub : ""}`
+                            };
 
-                            const tes: DiscordWebhook = (await webhookData.json()) as DiscordWebhook;
-                            let ext2 = "jpg";
-                            if (tes.avatar?.startsWith("a_") ?? false) ext2 = "gif";
-                            things.avatarURL = `https://cdn.discordapp.com/avatars/${tes.id}/${tes.avatar}.${ext2}`;
-                            things.username = tes.name;
-                        }
+                            if (useWebhookProfile) {
+                                const webhookData = await fetch(webhookUrl, {
+                                    method: "GET",
+                                    headers
+                                });
 
-                        if (embeds[0]) {
-                            things.embeds = embeds;
-                        } else if (sticker_items) {
-                            things.files = sticker_items.map(
-                                (a: APIStickerItem) => `https://media.discordapp.net/stickers/${a.id}.webp`
-                            );
-                        } else if (attachments[0]) {
-                            const fileSizeInBytes = Math.max(...attachments.map((a: APIAttachment) => a.size));
-                            const fileSizeInMegabytes = fileSizeInBytes / (1_024 * 1_024);
-                            if (fileSizeInMegabytes < 8) {
-                                things.files = attachments.map((a: APIAttachment) => a.url);
-                            } else {
-                                things.content += attachments.map((a: APIAttachment) => a.url).join("\n");
+                                const tes: DiscordWebhook = (await webhookData.json()) as DiscordWebhook;
+                                let ext2 = "jpg";
+                                if (tes.avatar?.startsWith("a_") ?? false) ext2 = "gif";
+                                things.avatarURL = `https://cdn.discordapp.com/avatars/${tes.id}/${tes.avatar}.${ext2}`;
+                                things.username = tes.name;
                             }
+
+                            if (embeds[0]) {
+                                things.embeds = embeds;
+                            } else if (sticker_items) {
+                                things.files = sticker_items.map(
+                                    (a: APIStickerItem) => `https://media.discordapp.net/stickers/${a.id}.webp`
+                                );
+                            } else if (attachments[0]) {
+                                const fileSizeInBytes = Math.max(...attachments.map((a: APIAttachment) => a.size));
+                                const fileSizeInMegabytes = fileSizeInBytes / (1_024 * 1_024);
+                                if (fileSizeInMegabytes < 8) {
+                                    things.files = attachments.map((a: APIAttachment) => a.url);
+                                } else {
+                                    things.content += attachments.map((a: APIAttachment) => a.url).join("\n");
+                                }
+                            }
+
+                            await executeWebhook(things);
                         }
-                        await executeWebhook(things);
                     }
                 }
                 break;
