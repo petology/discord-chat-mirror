@@ -83,8 +83,6 @@ export const listen = (): void => {
                     const { content, attachments, embeds, sticker_items, author, channel_id } = d;
                     const { avatar, username, discriminator: discriminatorRaw, id, bot } = author;
 
-                    if (bot) return;
-
                     let ext = "jpg";
                     let ub = " [USER]";
                     const discriminator: string | null = discriminatorRaw === "0" ? null : `#${discriminatorRaw}`;
